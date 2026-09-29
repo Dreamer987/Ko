@@ -1,0 +1,872 @@
+local Library = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"
+))()
+
+local Window = Library:CreateWindow({
+    Title = "Character",
+    Footer = "Basic v2",
+    ToggleKeybind = Enum.KeyCode.RightControl,
+})
+
+local Tab = Window:AddTab("General", "user")
+local Character = Tab:AddLeftGroupbox("Character")
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Player = Players.LocalPlayer
+
+--// SPEED BOOST
+Character:AddSlider("SpeedBoost", {
+    Text = "Speed Boost",
+    Default = 21,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+
+    Callback = function(Value)
+        local Character = Player.Character
+        local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+
+        if Humanoid then
+            Humanoid.WalkSpeed = Value
+        end
+    end,
+})
+
+Character:AddToggle("EnableSpeedBoost", {
+    Text = "Enable Speed Boost",
+    Default = false,
+
+    Callback = function(Value)
+        local Character = Player.Character
+        local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+
+        if Humanoid then
+            if Value then
+                Humanoid.WalkSpeed = Library.Options.SpeedBoost.Value
+            else
+                Humanoid.WalkSpeed = 16
+            end
+        end
+    end,
+})
+
+--// FLY
+local FlyEnabled = false
+local FlyConnection
+
+Character:AddToggle("Fly", {
+    Text = "Fly",
+    Default = false,
+
+    Callback = function(Value)
+        FlyEnabled = Value
+
+        if FlyConnection then
+            FlyConnection:Disconnect()
+            FlyConnection = nil
+        end
+
+        if not Value then
+            local Root = Player.Character
+                and Player.Character:FindFirstChild("HumanoidRootPart")
+
+            if Root then
+                Root.AssemblyLinearVelocity = Vector3.zero
+            end
+            return
+        end
+
+        FlyConnection = RunService.RenderStepped:Connect(function()
+            if not FlyEnabled then return end
+
+            local Character = Player.Character
+            local Root = Character and Character:FindFirstChild("HumanoidRootPart")
+
+            if not Root then return end
+
+            local Camera = workspace.CurrentCamera
+            local Speed = Library.Options.FlySpeed.Value
+
+            local Direction = Vector3.zero
+
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then
+                Direction += Camera.CFrame.LookVector
+            end
+
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then
+                Direction -= Camera.CFrame.LookVector
+            end
+
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then
+                Direction -= Camera.CFrame.RightVector
+            end
+
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then
+                Direction += Camera.CFrame.RightVector
+            end
+
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
+                Direction += Vector3.new(0, 1, 0)
+            end
+
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftControl) then
+                Direction -= Vector3.new(0, 1, 0)
+            end
+
+            if Direction.Magnitude > 0 then
+                Direction = Direction.Unit * Speed
+            end
+
+            Root.AssemblyLinearVelocity = Direction
+        end)
+    end,
+})
+
+Character:AddSlider("FlySpeed", {
+    Text = "Fly Speed",
+    Default = 20,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+})
+
+--// NOCLIP
+local NoclipEnabled = false
+local NoclipConnection
+
+Character:AddToggle("Noclip", {
+    Text = "Noclip",
+    Default = false,
+
+    Callback = function(Value)
+        NoclipEnabled = Value
+
+        if NoclipConnection then
+            NoclipConnection:Disconnect()
+            NoclipConnection = nil
+        end
+
+        if Value then
+            NoclipConnection = RunService.Stepped:Connect(function()
+                local Character = Player.Character
+
+                if Character then
+                    for _, Part in ipairs(Character:GetDescendants()) do
+                        if Part:IsA("BasePart") then
+                            Part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        else
+            local Character = Player.Character
+
+            if Character then
+                for _, Part in ipairs(Character:GetDescendants()) do
+                    if Part:IsA("BasePart") then
+                        Part.CanCollide = true
+                    end
+                end
+            end
+        end
+    end,
+})
+
+--// AUTO PUNCH
+local PunchRemote = ReplicatedStorage
+    :WaitForChild("Remotes")
+    :WaitForChild("SkillRemote")
+
+Character:AddToggle("AutoPunch", {
+    Text = "Auto punch",
+    Default = false,
+
+    Callback = function(Value)
+        if Value then
+            task.spawn(function()
+                while Library.Toggles.AutoPunch.Value do
+
+                    local Character = Player.Character
+                    local Root = Character
+                        and Character:FindFirstChild("HumanoidRootPart")
+
+                    if Root then
+                        local Camera = workspace.CurrentCamera
+
+                        local args = {
+                            [1] = {
+                                ["Camera"] = Camera.CFrame,
+                                ["SkillId"] = "1",
+                                ["Began"] = true,
+                                ["CFrame"] = Root.CFrame,
+                                ["Typ\208\181"] = 1,
+                                ["Aim"] = Root.Position + Camera.CFrame.LookVector * 100
+                            }
+                        }
+
+                        PunchRemote:FireServer(unpack(args))
+                    end
+
+                    task.wait(Library.Options.PunchDelay.Value)
+                end
+            end)
+        end
+    end,
+})
+
+--// PUNCH DELAY
+Character:AddSlider("PunchDelay", {
+    Text = "Punch Delay",
+    Default = 0.07,
+    Min = 0.01,
+    Max = 1,
+    Rounding = 2,
+    Suffix = "s",
+})
+
+Library:OnUnload(function()
+    if FlyConnection then
+        FlyConnection:Disconnect()
+    end
+
+    if NoclipConnection then
+        NoclipConnection:Disconnect()
+    end
+end)
+--// AUTOMATION
+local Automation = Tab:AddRightGroupbox("Automation")
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+
+--==================================================
+-- AUTO FARM SPEED
+--==================================================
+
+Automation:AddToggle("AutoFarmSpeed", {
+    Text = "Auto farm speed",
+    Default = false,
+
+    Callback = function(Value)
+        if Value then
+            task.spawn(function()
+                while Library.Toggles.AutoFarmSpeed.Value do
+                    local Character = LocalPlayer.Character
+                    local Humanoid = Character
+                        and Character:FindFirstChildOfClass("Humanoid")
+
+                    if Humanoid then
+                        -- Auto walk tại chỗ
+                        Humanoid:Move(Vector3.new(1, 0, 0), false)
+                    end
+
+                    task.wait(0.05)
+                end
+
+                local Character = LocalPlayer.Character
+                local Humanoid = Character
+                    and Character:FindFirstChildOfClass("Humanoid")
+
+                if Humanoid then
+                    Humanoid:Move(Vector3.zero, false)
+                end
+            end)
+        end
+    end,
+})
+
+--==================================================
+-- AUTO GET GOOD BOTH TRADING PLAZA
+--==================================================
+
+Automation:AddToggle("AutoGetGoodBoth", {
+    Text = "Auto get good both trading plaza",
+    Default = false,
+
+    Callback = function(Value)
+        if Value then
+            task.spawn(function()
+                while Library.Toggles.AutoGetGoodBoth.Value do
+
+                    for i = 1, 16 do
+                        if not Library.Toggles.AutoGetGoodBoth.Value then
+                            break
+                        end
+
+                        local Booth = workspace:FindFirstChild("Misc")
+                            and workspace.Misc:FindFirstChild("Booths")
+                            and workspace.Misc.Booths:FindFirstChild("Booth" .. i)
+
+                        local TradeBooth = Booth
+                            and Booth:FindFirstChild("TradeBooth")
+
+                        local RE = TradeBooth
+                            and TradeBooth:FindFirstChild("RE")
+
+                        local Claim = RE
+                            and RE:FindFirstChild("Claim")
+
+                        if Claim then
+                            pcall(function()
+                                Claim:FireServer(true)
+                            end)
+                        end
+
+                        task.wait(0.05)
+                    end
+
+                    task.wait(0.05)
+                end
+            end)
+        end
+    end,
+})
+
+--==================================================
+-- AUTO SOUND SERVER / DASH
+--==================================================
+
+local SoundServerStarted = false
+
+Automation:AddToggle("AutoSoundServer", {
+    Text = "Auto sound server",
+    Default = false,
+
+    Callback = function(Value)
+
+        if not Value then
+            return
+        end
+
+        -- Lần đầu chỉ hiện thông báo
+        if not SoundServerStarted then
+            SoundServerStarted = true
+
+            Library:Notify({
+                Title = "Auto sound server",
+                Description = "You need bypass cooldown dash",
+                Time = 4
+            })
+
+            return
+        end
+
+        -- Lần bật tiếp theo mới chạy
+        task.spawn(function()
+            while Library.Toggles.AutoSoundServer.Value do
+
+                local Character = LocalPlayer.Character
+                local Root = Character
+                    and Character:FindFirstChild("HumanoidRootPart")
+
+                if Root then
+                    local Camera = workspace.CurrentCamera
+
+                    local args = {
+                        [1] = {
+                            ["Camera"] = Camera.CFrame,
+                            ["SkillId"] = "7",
+                            ["Typ\208\181"] = 1,
+                            ["Began"] = true,
+                            ["CFrame"] = Root.CFrame,
+                            ["DashDirection"] = Camera.CFrame.LookVector,
+                            ["Aim"] = Root.Position
+                                + Camera.CFrame.LookVector * 150
+                        }
+                    }
+
+                    pcall(function()
+                        ReplicatedStorage
+                            :WaitForChild("Remotes")
+                            :WaitForChild("SkillRemote")
+                            :FireServer(unpack(args))
+                    end)
+                end
+
+                task.wait(0.02)
+            end
+        end)
+    end,
+})
+
+--==================================================
+-- ENEMY BLAST AURA
+--==================================================
+
+local EnemyBlastRange = 300
+
+Automation:AddToggle("EnemyBlastAura", {
+    Text = "Enemy blast aura",
+    Default = false,
+
+    Callback = function(Value)
+        if Value then
+            task.spawn(function()
+
+                while Library.Toggles.EnemyBlastAura.Value do
+
+                    local Character = LocalPlayer.Character
+                    local Root = Character
+                        and Character:FindFirstChild("HumanoidRootPart")
+
+                    if Root then
+
+                        local MobsFolder = workspace
+                            :FindFirstChild("World Mobs")
+
+                        if MobsFolder then
+
+                            for _, Folder in ipairs(MobsFolder:GetChildren()) do
+
+                                if Folder:IsA("Folder") or Folder:IsA("Model") then
+
+                                    for _, Mob in ipairs(Folder:GetChildren()) do
+
+                                        if not Library.Toggles.EnemyBlastAura.Value then
+                                            break
+                                        end
+
+                                        if Mob:IsA("Model") then
+
+                                            local MobRoot =
+                                                Mob:FindFirstChild("HumanoidRootPart")
+                                                or Mob.PrimaryPart
+
+                                            if MobRoot then
+
+                                                local Distance =
+                                                    (MobRoot.Position - Root.Position).Magnitude
+
+                                                if Distance <= EnemyBlastRange then
+
+                                                    -- Lock mob
+                                                    pcall(function()
+                                                        ReplicatedStorage
+                                                            :WaitForChild("Packages")
+                                                            :WaitForChild("_Index")
+                                                            :WaitForChild("sleitnick_knit@1.4.7")
+                                                            :WaitForChild("knit")
+                                                            :WaitForChild("Services")
+                                                            :WaitForChild("SkillManager")
+                                                            :WaitForChild("RE")
+                                                            :WaitForChild("LockedOnChanged")
+                                                            :FireServer(Mob)
+                                                    end)
+
+                                                    -- Enemy Blast
+                                                    local Camera =
+                                                        workspace.CurrentCamera
+
+                                                    local args = {
+                                                        [1] = {
+                                                            ["Camera"] = Camera.CFrame,
+                                                            ["SkillId"] = "101",
+                                                            ["Began"] = true,
+                                                            ["CFrame"] = Root.CFrame,
+                                                            ["Typ\208\181"] = 1,
+                                                            ["Aim"] = MobRoot.Position
+                                                        }
+                                                    }
+
+                                                    pcall(function()
+                                                        ReplicatedStorage
+                                                            :WaitForChild("Remotes")
+                                                            :WaitForChild("SkillRemote")
+                                                            :FireServer(unpack(args))
+                                                    end)
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    task.wait(0.02)
+                end
+            end)
+        end
+    end,
+})
+
+Automation:AddSlider("EnemyBlastRange", {
+    Text = "Range enemy blast",
+    Default = 300,
+    Min = 50,
+    Max = 500,
+    Rounding = 0,
+
+    Callback = function(Value)
+        EnemyBlastRange = Value
+    end,
+})
+
+--==================================================
+-- AUTO KILL ZAJA
+--==================================================
+
+Automation:AddToggle("AutoKillZaja", {
+    Text = "Auto kill Zaja",
+    Default = false,
+
+    Callback = function(Value)
+
+        if Value then
+            task.spawn(function()
+
+                while Library.Toggles.AutoKillZaja.Value do
+
+                    local EventMobs = workspace
+                        :FindFirstChild("World Mobs")
+                        and workspace["World Mobs"]:FindFirstChild("Event Mobs")
+
+                    local Zaja = EventMobs
+                        and EventMobs:FindFirstChild("Zaja")
+
+                    local Character = LocalPlayer.Character
+                    local Root = Character
+                        and Character:FindFirstChild("HumanoidRootPart")
+
+                    if Zaja and Root then
+
+                        local ZajaRoot =
+                            Zaja:FindFirstChild("HumanoidRootPart")
+                            or Zaja.PrimaryPart
+
+                        if ZajaRoot then
+
+                            -- Tween liên tục tới Zaja
+                            local TargetCFrame =
+                                ZajaRoot.CFrame * CFrame.new(0, 0, 8)
+
+                            local Distance =
+                                (Root.Position - ZajaRoot.Position).Magnitude
+
+                            local Time =
+                                math.clamp(Distance / 250, 0.05, 0.5)
+
+                            local Tween = TweenService:Create(
+                                Root,
+                                TweenInfo.new(
+                                    Time,
+                                    Enum.EasingStyle.Linear
+                                ),
+                                {
+                                    CFrame = TargetCFrame
+                                }
+                            )
+
+                            Tween:Play()
+                            Tween.Completed:Wait()
+                        end
+                    else
+                        -- Chờ Zaja xuất hiện
+                        task.wait(0.1)
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+
+
+local Tab1 = Window:AddTab("Exploits", "zap")
+
+--==================================================
+-- LEFT BOX
+--==================================================
+
+local Left = Tab1:AddLeftGroupbox("Bypass")
+
+local DashGuard = false
+local TeleportLock = false
+local StunGuard = false
+local HideEffects = false
+
+local SavedCFrame = nil
+
+-- Bypass Dash -> Dash Guard
+Left:AddToggle("BypassDash", {
+    Text = "Bypass Dash",
+    Default = false,
+
+    Callback = function(Value)
+        DashGuard = Value
+    end,
+})
+
+-- Bypass Teleport -> Position Lock
+Left:AddToggle("BypassTeleport", {
+    Text = "Bypass Teleport",
+    Default = false,
+
+    Callback = function(Value)
+        TeleportLock = Value
+
+        local Character = LocalPlayer.Character
+        local Root = Character and Character:FindFirstChild("HumanoidRootPart")
+
+        if Value and Root then
+            SavedCFrame = Root.CFrame
+        else
+            SavedCFrame = nil
+        end
+    end,
+})
+
+-- Bypass Stun -> Stun Guard
+Left:AddToggle("BypassStun", {
+    Text = "Bypass Stun",
+    Default = false,
+
+    Callback = function(Value)
+        StunGuard = Value
+    end,
+})
+
+-- Bypass Fake Lockon -> Lockon Tracker
+Left:AddToggle("BypassFakeLockon", {
+    Text = "Bypass Fake Lockon",
+    Default = false,
+
+    Callback = function(Value)
+        -- Local tracker only
+    end,
+})
+
+-- Bypass Skill Effect -> Hide Effects
+Left:AddToggle("BypassSkillEffect", {
+    Text = "Bypass Skill Effect",
+    Default = false,
+
+    Callback = function(Value)
+        HideEffects = Value
+
+        local Effects = workspace:FindFirstChild("Effects")
+
+        if Effects then
+            for _, Object in ipairs(Effects:GetDescendants()) do
+                if Object:IsA("ParticleEmitter")
+                or Object:IsA("Trail")
+                or Object:IsA("Beam") then
+                    Object.Enabled = not Value
+                end
+            end
+        end
+    end,
+})
+
+--==================================================
+-- RIGHT BOX
+--==================================================
+
+local Right = Tab1:AddRightGroupbox("Bypass")
+
+local AntiFall = false
+local VelocityEnabled = false
+local VelocityValue = 16
+local InfinitePVP = false
+local TeleportLockon = false
+
+local SelectedTarget = nil
+
+-- Anti Fall
+Right:AddToggle("AntiFall", {
+    Text = "Anti Fall",
+    Default = false,
+
+    Callback = function(Value)
+        AntiFall = Value
+    end,
+})
+
+-- Velocity Manipulation
+Right:AddToggle("VelocityManipulation", {
+    Text = "Velocity Manipulation",
+    Default = false,
+
+    Callback = function(Value)
+        VelocityEnabled = Value
+    end,
+})
+
+Right:AddSlider("VelocityValue", {
+    Text = "Velocity",
+    Default = 16,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+
+    Callback = function(Value)
+        VelocityValue = Value
+    end,
+})
+
+-- Infinite PvP
+Right:AddToggle("InfinitePvP", {
+    Text = "Infinite PvP",
+    Default = false,
+
+    Callback = function(Value)
+        InfinitePVP = Value
+    end,
+})
+
+-- Target list
+local function GetPlayers()
+    local List = {}
+
+    for _, Player in ipairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer then
+            table.insert(List, Player.Name)
+        end
+    end
+
+    table.sort(List)
+
+    return List
+end
+
+Right:AddDropdown("LockonTarget", {
+    Text = "Lockon",
+    Values = GetPlayers(),
+    Default = nil,
+
+    Callback = function(Value)
+        SelectedTarget = Players:FindFirstChild(Value)
+    end,
+})
+
+Right:AddToggle("TeleportLockon", {
+    Text = "Teleport Lockon",
+    Default = false,
+
+    Callback = function(Value)
+        TeleportLockon = Value
+    end,
+})
+
+-- Refresh player list
+task.spawn(function()
+    while task.wait(2) do
+        pcall(function()
+            Library.Options.LockonTarget:SetValues(GetPlayers())
+        end)
+    end
+end)
+
+--==================================================
+-- MAIN LOOP
+--==================================================
+
+RunService.Heartbeat:Connect(function()
+
+    local Character = LocalPlayer.Character
+    if not Character then
+        return
+    end
+
+    local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+    local Root = Character:FindFirstChild("HumanoidRootPart")
+
+    if not Humanoid or not Root then
+        return
+    end
+
+    -- Position Lock
+    if TeleportLock and SavedCFrame then
+        Root.CFrame = SavedCFrame
+        Root.AssemblyLinearVelocity = Vector3.zero
+    end
+
+    -- Anti Fall
+    if AntiFall then
+        if Humanoid:GetState() == Enum.HumanoidStateType.Freefall
+        or Humanoid:GetState() == Enum.HumanoidStateType.FallingDown then
+
+            Root.AssemblyLinearVelocity = Vector3.new(
+                Root.AssemblyLinearVelocity.X,
+                0,
+                Root.AssemblyLinearVelocity.Z
+            )
+        end
+    end
+
+    -- Velocity
+    if VelocityEnabled then
+        local Velocity = Root.AssemblyLinearVelocity
+
+        if Velocity.Magnitude > VelocityValue then
+            Root.AssemblyLinearVelocity =
+                Velocity.Unit * VelocityValue
+        end
+    end
+
+    -- Stun Guard
+    if StunGuard then
+        if Humanoid.WalkSpeed < 1 then
+            Humanoid.WalkSpeed = 16
+        end
+
+        if Humanoid.JumpPower < 1 then
+            Humanoid.JumpPower = 50
+        end
+    end
+
+    -- Teleport Lockon
+    if TeleportLockon and SelectedTarget then
+
+        local TargetCharacter = SelectedTarget.Character
+        local TargetRoot = TargetCharacter
+            and TargetCharacter:FindFirstChild("HumanoidRootPart")
+
+        if TargetRoot then
+            Root.CFrame =
+                TargetRoot.CFrame * CFrame.new(0, 0, 5)
+        end
+    end
+
+end)
+
+--==================================================
+-- CHARACTER RESPAWN
+--==================================================
+
+LocalPlayer.CharacterAdded:Connect(function(Character)
+
+    task.wait(1)
+
+    if TeleportLock then
+        local Root = Character:FindFirstChild("HumanoidRootPart")
+
+        if Root then
+            SavedCFrame = Root.CFrame
+        end
+    end
+end)
+
+Library:OnUnload(function()
+    DashGuard = false
+    TeleportLock = false
+    StunGuard = false
+    HideEffects = false
+    AntiFall = false
+    VelocityEnabled = false
+    InfinitePVP = false
+    TeleportLockon = false
+end)
